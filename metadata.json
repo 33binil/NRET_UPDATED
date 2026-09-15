@@ -1,0 +1,6 @@
+{
+  "name": "NRET - Nano Robotics & Embedded Technologies",
+  "description": "Modern Learning Management System for Nano Robotics & Embedded Technologies (NRET) featuring robotics, embedded systems, IoT, hands-on industrial projects, and professional certifications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
