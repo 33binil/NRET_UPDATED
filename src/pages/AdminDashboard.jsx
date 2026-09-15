@@ -33,7 +33,8 @@ import {
   ChevronRight,
   UserPlus,
   ExternalLink,
-  Save
+  Save,
+  FolderGit2
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -52,6 +53,11 @@ export default function AdminDashboard() {
     addWorkshop,
     updateWorkshop,
     deleteWorkshop,
+    liveProjects,
+    addLiveProject,
+    updateLiveProject,
+    deleteLiveProject,
+    toggleProjectPublish,
     addStudent,
     updateStudent,
     deleteStudent,
@@ -79,7 +85,36 @@ export default function AdminDashboard() {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showInternshipModal, setShowInternshipModal] = useState(false);
   const [showWorkshopModal, setShowWorkshopModal] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { type: 'course'|'student'|'internship'|'workshop', id: string, title: string }
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectCategoryFilter, setProjectCategoryFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { type: 'course'|'student'|'internship'|'workshop'|'project', id: string, title: string }
+
+  // Live Project Form State
+  const initialProjectForm = {
+    title: '',
+    category: 'Robotics & Automation',
+    type: 'Team Project',
+    duration: '8 Weeks',
+    level: 'Intermediate',
+    status: 'Live Project',
+    mentor: 'Dr. Arun Kumar',
+    mentorDesignation: 'Lead Robotics Faculty',
+    mentorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    shortDesc: '',
+    fullDesc: '',
+    problemStatement: '',
+    technologies: 'Arduino, Embedded C, Sensors',
+    objectives: 'Design circuit schematics\nWrite responsive firmware\nTest and validate telemetry',
+    skillsGained: 'Sensor calibration, Motor control, Hardware debugging',
+    studentResponsibilities: 'Develop firmware drivers\nConduct circuit tests\nDocument deliverables',
+    maxTeamSize: 4,
+    deadline: 'Monthly Cohorts',
+    published: true,
+    thumbnail: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80'
+  };
+  const [projectForm, setProjectForm] = useState(initialProjectForm);
 
   // Course Form State
   const initialCourseForm = {
@@ -274,7 +309,55 @@ export default function AdminDashboard() {
     if (type === 'student') deleteStudent(id);
     if (type === 'internship') deleteInternship(id);
     if (type === 'workshop') deleteWorkshop(id);
+    if (type === 'project') deleteLiveProject(id);
     setDeleteConfirm(null);
+  };
+
+  const handleOpenProjectModal = (proj = null) => {
+    if (proj) {
+      setEditingProject(proj);
+      setProjectForm({
+        ...proj,
+        technologies: Array.isArray(proj.technologies) ? proj.technologies.join(', ') : (proj.technologies || ''),
+        objectives: Array.isArray(proj.objectives) ? proj.objectives.join('\n') : (proj.objectives || ''),
+        skillsGained: Array.isArray(proj.skillsGained) ? proj.skillsGained.join(', ') : (proj.skillsGained || ''),
+        studentResponsibilities: Array.isArray(proj.studentResponsibilities) ? proj.studentResponsibilities.join('\n') : (proj.studentResponsibilities || '')
+      });
+    } else {
+      setEditingProject(null);
+      setProjectForm(initialProjectForm);
+    }
+    setShowProjectModal(true);
+  };
+
+  const handleSaveProject = (e) => {
+    e.preventDefault();
+    if (!projectForm.title.trim()) return;
+
+    const payload = {
+      ...projectForm,
+      technologies: typeof projectForm.technologies === 'string'
+        ? projectForm.technologies.split(',').map(s => s.trim()).filter(Boolean)
+        : projectForm.technologies,
+      objectives: typeof projectForm.objectives === 'string'
+        ? projectForm.objectives.split('\n').map(s => s.trim()).filter(Boolean)
+        : projectForm.objectives,
+      skillsGained: typeof projectForm.skillsGained === 'string'
+        ? projectForm.skillsGained.split(',').map(s => s.trim()).filter(Boolean)
+        : projectForm.skillsGained,
+      studentResponsibilities: typeof projectForm.studentResponsibilities === 'string'
+        ? projectForm.studentResponsibilities.split('\n').map(s => s.trim()).filter(Boolean)
+        : projectForm.studentResponsibilities
+    };
+
+    if (editingProject) {
+      updateLiveProject(editingProject.id, payload);
+      addToast(`Live Project "${payload.title}" updated successfully!`);
+    } else {
+      addLiveProject(payload);
+      addToast(`New Live Project "${payload.title}" created successfully!`);
+    }
+    setShowProjectModal(false);
   };
 
   const handleSaveSettings = (e) => {
@@ -461,6 +544,18 @@ export default function AdminDashboard() {
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Workshops ({workshopsList.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('projects')}
+            className={`px-4 py-2.5 rounded-full transition shrink-0 flex items-center gap-1.5 ${
+              activeTab === 'projects'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <FolderGit2 className="w-3.5 h-3.5" />
+            <span>Live Projects ({liveProjects?.length || 0})</span>
           </button>
 
           <button
@@ -1156,6 +1251,199 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* TAB 5.5: LIVE PROJECTS MANAGEMENT */}
+        {activeTab === 'projects' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">Live Projects Management</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Programs / Practical Learning
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Oversee real-world engineering projects, assign mentors, adjust team sizes, and update project specifications.
+                </p>
+              </div>
+              <button
+                onClick={() => handleOpenProjectModal()}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-xs font-bold shadow-xs transition flex items-center gap-1.5 self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Live Project</span>
+              </button>
+            </div>
+
+            {/* Search & Filter Toolbar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search live projects by title, mentor, or technology..."
+                  value={projectSearch}
+                  onChange={(e) => setProjectSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-indigo-500 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={projectCategoryFilter}
+                  onChange={(e) => setProjectCategoryFilter(e.target.value)}
+                  className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 font-medium"
+                >
+                  <option value="all">All Disciplines</option>
+                  <option value="Robotics & Automation">Robotics & Automation</option>
+                  <option value="Embedded Systems">Embedded Systems</option>
+                  <option value="IoT & Automation">IoT & Automation</option>
+                  <option value="Web & Cloud Development">Web & Cloud Development</option>
+                  <option value="Industrial Automation">Industrial Automation</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Projects Grid */}
+            {(() => {
+              const filteredProjects = (liveProjects || []).filter((p) => {
+                const matchesSearch =
+                  p.title.toLowerCase().includes(projectSearch.toLowerCase()) ||
+                  (p.mentor && p.mentor.toLowerCase().includes(projectSearch.toLowerCase())) ||
+                  (Array.isArray(p.technologies) && p.technologies.some(t => t.toLowerCase().includes(projectSearch.toLowerCase())));
+                const matchesCategory =
+                  projectCategoryFilter === 'all' || p.category === projectCategoryFilter;
+                return matchesSearch && matchesCategory;
+              });
+
+              if (filteredProjects.length === 0) {
+                return (
+                  <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-2xs space-y-3">
+                    <FolderGit2 className="w-10 h-10 text-slate-300 mx-auto" />
+                    <h4 className="text-base font-bold text-slate-800">No live projects found</h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      No project matches your search and filter criteria. Try adjusting your search query or add a new project.
+                    </p>
+                    <button
+                      onClick={() => handleOpenProjectModal()}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Live Project</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProjects.map((proj) => (
+                    <div
+                      key={proj.id}
+                      className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs hover:shadow-md transition flex flex-col justify-between space-y-4"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200/60">
+                            {proj.category}
+                          </span>
+                          <button
+                            onClick={() => toggleProjectPublish(proj.id)}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition ${
+                              proj.published !== false
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                : 'bg-slate-100 text-slate-500 border-slate-200'
+                            }`}
+                            title="Click to toggle publish status"
+                          >
+                            {proj.published !== false ? 'Published' : 'Draft'}
+                          </button>
+                        </div>
+
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900 leading-snug">
+                            {proj.title}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                            {proj.shortDesc}
+                          </p>
+                        </div>
+
+                        {/* Tech stack badges */}
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {proj.technologies && proj.technologies.slice(0, 3).map((tech, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded-md"
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                          {proj.technologies && proj.technologies.length > 3 && (
+                            <span className="px-1.5 py-0.5 text-[10px] text-slate-400">
+                              +{proj.technologies.length - 3}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Project Specs */}
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] uppercase text-slate-400 block font-bold">Duration</span>
+                            <span className="font-semibold text-slate-800">{proj.duration}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase text-slate-400 block font-bold">Level</span>
+                            <span className="font-semibold text-slate-800">{proj.level}</span>
+                          </div>
+                          <div className="col-span-2 pt-1 border-t border-slate-200/50 flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500">Mentor: <strong>{proj.mentor}</strong></span>
+                            <span className="text-[11px] text-indigo-600 font-bold">{proj.enrolledCount || 12} Enrolled</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Action footer */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <Link
+                          to={`/programs?tab=projects&id=${proj.id}`}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                        >
+                          <span>Preview on Portal</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenProjectModal(proj)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 transition"
+                            title="Edit Project Details"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setDeleteConfirm({
+                                type: 'project',
+                                id: proj.id,
+                                title: proj.title
+                              })
+                            }
+                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                            title="Delete Live Project"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* TAB 6: FINANCIALS & TRANSACTIONS */}
         {activeTab === 'transactions' && (
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
@@ -1785,6 +2073,206 @@ export default function AdminDashboard() {
                   className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition"
                 >
                   Publish Workshop
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: CREATE / EDIT LIVE PROJECT */}
+      {showProjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2">
+                <FolderGit2 className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-bold text-sm text-slate-900">
+                  {editingProject ? 'Edit Live Engineering Project' : 'Create New Live Project'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowProjectModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProject} className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Project Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Autonomous Mobile Robot with ROS 2 & LiDAR SLAM"
+                  value={projectForm.title}
+                  onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Discipline / Category</label>
+                  <select
+                    value={projectForm.category}
+                    onChange={(e) => setProjectForm({ ...projectForm, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  >
+                    <option value="Robotics & Automation">Robotics & Automation</option>
+                    <option value="Embedded Systems">Embedded Systems</option>
+                    <option value="IoT & Automation">IoT & Automation</option>
+                    <option value="Web & Cloud Development">Web & Cloud Development</option>
+                    <option value="Industrial Automation">Industrial Automation</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Duration</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 8 Weeks (40 hrs)"
+                    value={projectForm.duration}
+                    onChange={(e) => setProjectForm({ ...projectForm, duration: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Difficulty Level</label>
+                  <select
+                    value={projectForm.level}
+                    onChange={(e) => setProjectForm({ ...projectForm, level: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  >
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Assigned Mentor</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Dr. Arun Kumar"
+                    value={projectForm.mentor}
+                    onChange={(e) => setProjectForm({ ...projectForm, mentor: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mentor Designation</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lead Robotics & Autonomous Systems Faculty"
+                    value={projectForm.mentorDesignation}
+                    onChange={(e) => setProjectForm({ ...projectForm, mentorDesignation: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Short Description (Summary)</label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="Concise 1-2 sentence overview of what this project builds..."
+                  value={projectForm.shortDesc}
+                  onChange={(e) => setProjectForm({ ...projectForm, shortDesc: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Real-World Problem Statement</label>
+                <textarea
+                  rows={2}
+                  placeholder="Explain the actual industry challenge this project addresses..."
+                  value={projectForm.problemStatement}
+                  onChange={(e) => setProjectForm({ ...projectForm, problemStatement: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Technologies & Tools (Comma separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. ROS 2 Humble, Python, C++, LiDAR, OpenCV, Gazebo"
+                  value={projectForm.technologies}
+                  onChange={(e) => setProjectForm({ ...projectForm, technologies: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Key Learning Objectives (One per line)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Hardware integration&#10;Driver development&#10;Validation testing"
+                    value={projectForm.objectives}
+                    onChange={(e) => setProjectForm({ ...projectForm, objectives: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Student Responsibilities (One per line)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Develop firmware drivers&#10;Implement SLAM mapping&#10;Conduct team sprint reviews"
+                    value={projectForm.studentResponsibilities}
+                    onChange={(e) => setProjectForm({ ...projectForm, studentResponsibilities: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Max Team Size</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={projectForm.maxTeamSize}
+                    onChange={(e) => setProjectForm({ ...projectForm, maxTeamSize: parseInt(e.target.value) || 4 })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-5">
+                  <input
+                    type="checkbox"
+                    id="projectPublishedCheckbox"
+                    checked={projectForm.published !== false}
+                    onChange={(e) => setProjectForm({ ...projectForm, published: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="projectPublishedCheckbox" className="font-semibold text-slate-800 cursor-pointer">
+                    Publish immediately to Programs Catalog
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowProjectModal(false)}
+                  className="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-xs flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{editingProject ? 'Update Live Project' : 'Publish Live Project'}</span>
                 </button>
               </div>
             </form>

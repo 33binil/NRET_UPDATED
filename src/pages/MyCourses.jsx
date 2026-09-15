@@ -25,7 +25,8 @@ export default function MyCourses() {
   });
 
   const handleOpenCertificate = (course) => {
-    const cert = sampleCertificates.find((c) => c.courseId === course.id) || sampleCertificates[0];
+    const certs = sampleCertificates || [];
+    const cert = certs.find((c) => c.courseId === course.id) || certs[0] || null;
     setSelectedCert(cert);
     setCertModalOpen(true);
   };

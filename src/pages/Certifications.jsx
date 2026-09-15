@@ -25,8 +25,8 @@ export default function Certifications() {
     e.preventDefault();
     setSearched(true);
     const idToSearch = certIdInput.trim().toUpperCase();
-    const match = sampleCertificates.find((c) => c.id.toUpperCase() === idToSearch) ||
-                  certificates.find((c) => c.id.toUpperCase() === idToSearch);
+    const allCerts = [...(sampleCertificates || []), ...(certificates || [])];
+    const match = allCerts.find((c) => c.id && c.id.toUpperCase() === idToSearch);
     setVerifiedResult(match || null);
   };
 

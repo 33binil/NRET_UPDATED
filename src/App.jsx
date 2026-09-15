@@ -27,6 +27,7 @@ import Contact from './pages/Contact';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import Programs from './pages/Programs';
 
 function AppLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -57,6 +58,8 @@ function AppLayout() {
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<Home onOpenSearch={() => setSearchOpen(true)} />} />
               <Route path="/about" element={<About />} />
+              <Route path="/programs" element={<Programs />} />
+              <Route path="/live-projects" element={<Navigate to="/programs?tab=projects" replace />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/:id" element={<CourseDetails />} />
               <Route path="/learn/:courseId" element={<CoursePlayer />} />

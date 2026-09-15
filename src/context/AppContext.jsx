@@ -4,6 +4,8 @@ import {
   instructors as initialInstructors,
   internships as initialInternships,
   workshops as initialWorkshops,
+  initialLiveProjects,
+  initialTrainingPrograms,
   sampleCertificates,
   sampleQuizzes,
   sampleAssignments,
@@ -97,6 +99,73 @@ export const AppProvider = ({ children }) => {
       try { return JSON.parse(saved); } catch (e) { }
     }
     return initialWorkshops;
+  });
+
+  // Live Projects Catalog
+  const [liveProjects, setLiveProjects] = useState(() => {
+    const saved = localStorage.getItem('nret_live_projects');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return initialLiveProjects;
+  });
+
+  // Training Programs Catalog
+  const [trainingPrograms, setTrainingPrograms] = useState(() => {
+    const saved = localStorage.getItem('nret_training_programs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return initialTrainingPrograms;
+  });
+
+  // Student Enrolled Live Projects
+  const [studentLiveProjects, setStudentLiveProjects] = useState(() => {
+    const saved = localStorage.getItem('nret_student_projects');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return [
+      {
+        projectId: "proj-rob-1",
+        title: "Machine Robotics Systems",
+        category: "Robotics & Automation",
+        progress: 65,
+        stage: "Development",
+        mentor: "Dr. Arun Kumar",
+        startDate: "September 1, 2026",
+        deadline: "October 30, 2026",
+        status: "Active",
+        role: "Robotics Firmware Lead",
+        team: "Autonomous Mobile AGV Crew (Team Delta)",
+        completedMilestones: [
+          "Requirements & Payload Calculation",
+          "H-Bridge Motor Driver Schematics",
+          "Bare-Metal PWM Firmware Setup"
+        ],
+        currentSprint: "Tuning PID speed curve with wheel optical encoders & obstacle avoidance",
+        repositoryUrl: "https://github.com/nret-student/machine-robotics-agv"
+      },
+      {
+        projectId: "proj-web-2",
+        title: "Website Development & Selling Platform",
+        category: "Web Development",
+        progress: 40,
+        stage: "Design",
+        mentor: "Prof. Sneha Pillai",
+        startDate: "September 15, 2026",
+        deadline: "November 15, 2026",
+        status: "Active",
+        role: "Full-Stack Web Architect",
+        team: "Hardware Marketplace Product Team",
+        completedMilestones: [
+          "Product Specification & Wireframes",
+          "MongoDB Schema & REST API Endpoints"
+        ],
+        currentSprint: "Implementing Stripe checkout workflow & responsive shopping cart state",
+        repositoryUrl: "https://github.com/nret-student/nret-ecommerce-platform"
+      }
+    ];
   });
 
   // All Students Directory for Administration
@@ -345,6 +414,18 @@ export const AppProvider = ({ children }) => {
   }, [workshopsList]);
 
   useEffect(() => {
+    localStorage.setItem('nret_live_projects', JSON.stringify(liveProjects));
+  }, [liveProjects]);
+
+  useEffect(() => {
+    localStorage.setItem('nret_training_programs', JSON.stringify(trainingPrograms));
+  }, [trainingPrograms]);
+
+  useEffect(() => {
+    localStorage.setItem('nret_student_projects', JSON.stringify(studentLiveProjects));
+  }, [studentLiveProjects]);
+
+  useEffect(() => {
     localStorage.setItem('nret_students', JSON.stringify(allStudents));
   }, [allStudents]);
 
@@ -573,6 +654,82 @@ export const AppProvider = ({ children }) => {
     addToast("Workshop removed", "info");
   };
 
+  // Live Projects Management
+  const addLiveProject = (projectData) => {
+    const newProject = {
+      ...projectData,
+      id: projectData.id || `proj-${Date.now()}`,
+      published: projectData.published !== undefined ? projectData.published : true,
+      enrolledStudents: Number(projectData.enrolledStudents) || 0
+    };
+    setLiveProjects(prev => [newProject, ...prev]);
+    addToast(`Live Project "${newProject.title}" added successfully!`);
+    return newProject;
+  };
+
+  const updateLiveProject = (id, updatedFields) => {
+    setLiveProjects(prev => prev.map(p => p.id === id ? { ...p, ...updatedFields } : p));
+    addToast("Live project details updated!");
+  };
+
+  const deleteLiveProject = (id) => {
+    setLiveProjects(prev => prev.filter(p => p.id !== id));
+    addToast("Live project deleted", "info");
+  };
+
+  const toggleProjectPublish = (id) => {
+    setLiveProjects(prev => prev.map(p => {
+      if (p.id === id) {
+        const nextStatus = !p.published;
+        addToast(`Live project ${nextStatus ? 'published to students' : 'hidden (draft)'}`);
+        return { ...p, published: nextStatus };
+      }
+      return p;
+    }));
+  };
+
+  const enrollStudentInProject = (project) => {
+    const existing = studentLiveProjects.find(sp => sp.projectId === project.id);
+    if (existing) {
+      addToast(`You are already enrolled in "${project.title}"!`, "info");
+      return;
+    }
+    const newEnrollment = {
+      projectId: project.id,
+      title: project.title,
+      category: project.category,
+      progress: 10,
+      stage: "Idea",
+      mentor: project.mentor,
+      startDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      deadline: project.deadline || "Within 8 Weeks",
+      status: "Active",
+      role: "Student Project Contributor",
+      team: "NRET Innovation Team",
+      completedMilestones: ["Team Formation & Kickoff"],
+      currentSprint: "Specifications & BOM Component Review",
+      repositoryUrl: "https://github.com/nret-student/" + project.id
+    };
+    setStudentLiveProjects(prev => [newEnrollment, ...prev]);
+    setLiveProjects(prev => prev.map(p => p.id === project.id ? { ...p, enrolledStudents: (p.enrolledStudents || 0) + 1 } : p));
+    addToast(`Enrolled in "${project.title}"! Check your Student Dashboard.`);
+  };
+
+  const updateStudentProjectProgress = (projectId, newProgress, newStage) => {
+    setStudentLiveProjects(prev => prev.map(sp => {
+      if (sp.projectId === projectId) {
+        return {
+          ...sp,
+          progress: newProgress !== undefined ? newProgress : sp.progress,
+          stage: newStage || sp.stage,
+          status: (newProgress !== undefined ? newProgress : sp.progress) >= 100 ? "Completed" : "Active"
+        };
+      }
+      return sp;
+    }));
+    addToast("Project progress updated successfully!");
+  };
+
   // Transactions
   const addTransaction = (txn) => {
     setTransactions(prev => [{ ...txn, id: `TXN-${Date.now()}` }, ...prev]);
@@ -628,7 +785,17 @@ export const AppProvider = ({ children }) => {
         internshipsList,
         workshopsList,
         registerWorkshop,
+        liveProjects,
+        trainingPrograms,
+        studentLiveProjects,
+        addLiveProject,
+        updateLiveProject,
+        deleteLiveProject,
+        toggleProjectPublish,
+        enrollStudentInProject,
+        updateStudentProjectProgress,
         certificates,
+        sampleCertificates: certificates || sampleCertificates,
         assignments,
         submitAssignment,
         quizzes,

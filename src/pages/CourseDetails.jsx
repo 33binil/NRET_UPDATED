@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import CertificateModal from '../components/CertificateModal';
+import CourseProjectModal from '../components/CourseProjectModal';
 import {
   Star,
   Clock,
@@ -17,24 +18,44 @@ import {
   ShieldCheck,
   ArrowRight,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  FolderGit2,
+  Cpu,
+  Check,
+  CheckCircle2,
+  Layers,
+  Code2,
+  UserCheck,
+  ExternalLink,
+  PackageCheck
 } from 'lucide-react';
 
 export default function CourseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { courses, enrolledCourses, enrollCourse, currentUser, sampleCertificates } = useApp();
+  const {
+    courses,
+    enrolledCourses,
+    enrollCourse,
+    currentUser,
+    sampleCertificates,
+    liveProjects,
+    studentLiveProjects,
+    enrollStudentInProject
+  } = useApp();
 
-  const [expandedModules, setExpandedModules] = useState({ 'mod-1': true, 'mod-2': true });
   const [expandedFaq, setExpandedFaq] = useState({ 0: true });
   const [certModalOpen, setCertModalOpen] = useState(false);
 
-  const course = courses.find((c) => c.id === id) || courses[0];
-  const isEnrolled = enrolledCourses.some((e) => e.courseId === course.id);
+  // Project details modal state
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
 
-  const toggleModule = (modId) => {
-    setExpandedModules((prev) => ({ ...prev, [modId]: !prev[modId] }));
-  };
+  // Filter for projects (All, Course Capstones, Live Projects)
+  const [projectFilter, setProjectFilter] = useState('all');
+
+  const course = courses.find((c) => c.id === id) || courses[0] || {};
+  const isEnrolled = enrolledCourses.some((e) => e.courseId === course.id);
 
   const toggleFaq = (index) => {
     setExpandedFaq((prev) => ({ ...prev, [index]: !prev[index] }));
@@ -47,6 +68,36 @@ export default function CourseDetails() {
       enrollCourse(course.id);
       navigate(`/learn/${course.id}`);
     }
+  };
+
+  // Connected live projects matching this course
+  const matchedLiveProjects = (liveProjects || []).filter(p =>
+    p.published && (
+      (p.relatedCourseIds && p.relatedCourseIds.includes(course?.id)) ||
+      (p.category && course?.category && (
+        p.category.toLowerCase().includes((course.category.toLowerCase().split(' ')[0] || '')) ||
+        course.category.toLowerCase().includes((p.category.toLowerCase().split(' ')[0] || ''))
+      ))
+    )
+  );
+
+  const courseProjects = course.projects || [];
+
+  const handleOpenProjectModal = (proj) => {
+    setSelectedProject(proj);
+    setProjectModalOpen(true);
+  };
+
+  const handleEnrollInProject = (proj) => {
+    enrollStudentInProject(proj);
+    // If student isn't enrolled in the course yet, automatically enroll them so they get access to materials!
+    if (!isEnrolled) {
+      enrollCourse(course.id);
+    }
+  };
+
+  const isProjectEnrolled = (projId) => {
+    return (studentLiveProjects || []).some(sp => sp.projectId === projId);
   };
 
   // Sample FAQs
@@ -146,6 +197,54 @@ export default function CourseDetails() {
                   <span>Language: {course.language || 'English'}</span>
                 </div>
               </div>
+
+              {/* Quick Action Bar for Course Enrollment & Jump to Projects */}
+              <div className="mt-6 p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <FolderGit2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm block">
+                      Hands-On Engineering & Practical Projects
+                    </span>
+                    <span className="text-xs text-slate-600">
+                      Explore detailed project specs and enroll directly below.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <a
+                    href="#course-projects-section"
+                    className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <span>View Projects ({courseProjects.length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+
+                  <button
+                    onClick={handleEnrollAction}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                      isEnrolled
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    }`}
+                  >
+                    {isEnrolled ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Enrolled in Course</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Enroll in Course (${course.price})</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* WHAT YOU WILL LEARN */}
@@ -172,124 +271,12 @@ export default function CourseDetails() {
               </div>
             </div>
 
-            {/* COURSE CURRICULUM */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">Course Curriculum</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {course.modules?.length || 5} Modules • {course.lessonsCount || 32} Lessons • {course.duration}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    const allOpen = Object.keys(expandedModules).length > 0;
-                    if (allOpen) setExpandedModules({});
-                    else setExpandedModules({ 'mod-1': true, 'mod-2': true, 'mod-3': true });
-                  }}
-                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                >
-                  Toggle All
-                </button>
-              </div>
-
-              {/* Modules List */}
-              <div className="space-y-3">
-                {(course.modules && course.modules.length > 0 ? course.modules : [
-                  {
-                    id: 'mod-1',
-                    title: 'Module 01 — Introduction & Setup',
-                    lessons: [
-                      { id: 'les-1', title: 'Welcome & Hardware Kit Setup', duration: '12:40' },
-                      { id: 'les-2', title: 'Basic Concepts & Electronics Basics', duration: '24:15' },
-                      { id: 'les-3', title: 'Tools & IDE Installation', duration: '18:30' }
-                    ]
-                  },
-                  {
-                    id: 'mod-2',
-                    title: 'Module 02 — Fundamentals & Components',
-                    lessons: [
-                      { id: 'les-4', title: 'Core Concepts & PWM Modulation', duration: '28:10' },
-                      { id: 'les-5', title: 'Component Wiring & Safety', duration: '32:45' }
-                    ]
-                  },
-                  {
-                    id: 'mod-3',
-                    title: 'Module 03 — Practical Implementation',
-                    lessons: [
-                      { id: 'les-6', title: 'Hands-on Breadboard Prototyping', duration: '35:20' },
-                      { id: 'les-7', title: 'Project Testing & Sensor Fusion', duration: '29:40' }
-                    ]
-                  },
-                  {
-                    id: 'mod-4',
-                    title: 'Module 04 — Advanced Concepts',
-                    lessons: [
-                      { id: 'les-8', title: 'PID Tuning & Noise Filtering', duration: '41:10' },
-                      { id: 'les-9', title: 'Real-World Applications', duration: '22:15' }
-                    ]
-                  },
-                  {
-                    id: 'mod-5',
-                    title: 'Module 05 — Capstone Project',
-                    lessons: [
-                      { id: 'les-10', title: 'Project Planning & Architecture', duration: '19:50' },
-                      { id: 'les-11', title: 'Final Evaluation & Submission', duration: '30:00' }
-                    ]
-                  }
-                ]).map((module, mIdx) => {
-                  const isOpen = expandedModules[module.id];
-                  return (
-                    <div key={module.id || mIdx} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
-                      <button
-                        onClick={() => toggleModule(module.id)}
-                        className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-slate-50 transition"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center justify-center">
-                            0{mIdx + 1}
-                          </span>
-                          <div>
-                            <h3 className="font-bold text-sm text-slate-900">{module.title}</h3>
-                            <span className="text-[11px] text-slate-400">
-                              {module.lessons?.length || 3} Lessons
-                            </span>
-                          </div>
-                        </div>
-                        {isOpen ? (
-                          <ChevronUp className="w-4 h-4 text-slate-400" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-slate-400" />
-                        )}
-                      </button>
-
-                      {isOpen && (
-                        <div className="px-5 pb-4 pt-1 divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40">
-                          {(module.lessons || []).map((les, lIdx) => (
-                            <div key={les.id || lIdx} className="py-2.5 flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2.5 text-slate-700">
-                                <PlayCircle className="w-4 h-4 text-indigo-600 shrink-0" />
-                                <span className="font-medium">{les.title}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-slate-400 font-mono">
-                                <span>{les.duration || '15:00'}</span>
-                                {isEnrolled && (
-                                  <Link
-                                    to={`/learn/${course.id}`}
-                                    className="text-indigo-600 font-sans font-semibold hover:underline"
-                                  >
-                                    Play
-                                  </Link>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {/* COURSE CURRICULUM SUMMARY */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs">
+              <h2 className="text-xl font-bold text-slate-900">Course Curriculum</h2>
+              <p className="text-sm font-semibold text-slate-600 mt-1">
+                {course.modules?.length || 5} Modules • {course.lessonsCount || 36} Lessons • {course.duration || '11 Weeks (48 Hours)'}
+              </p>
             </div>
 
             {/* REQUIREMENTS & WHO THIS IS FOR */}
@@ -336,23 +323,289 @@ export default function CourseDetails() {
 
             </div>
 
-            {/* COURSE PROJECTS */}
-            {course.projects && course.projects.length > 0 && (
-              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs">
-                <h2 className="text-xl font-bold text-slate-900 mb-4">Hands-On Course Projects</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {course.projects.map((proj, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-                        Project 0{i + 1}
-                      </span>
-                      <h4 className="font-bold text-sm text-slate-900 mt-1">{proj.title}</h4>
-                      <p className="text-xs text-slate-600 mt-1">{proj.desc}</p>
-                    </div>
-                  ))}
+            {/* ★ DEDICATED COURSE PROJECTS & DETAILS SECTION ★ */}
+            <div id="course-projects-section" className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 mb-1.5">
+                    <FolderGit2 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Hands-On Engineering Projects</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                    Projects in this Course
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Click on any project to view complete technical details, bill of materials, and direct enrollment options.
+                  </p>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-semibold self-start sm:self-auto">
+                  <button
+                    onClick={() => setProjectFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                      projectFilter === 'all'
+                        ? 'bg-white text-indigo-600 shadow-2xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({courseProjects.length + matchedLiveProjects.length})
+                  </button>
+                  <button
+                    onClick={() => setProjectFilter('course')}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                      projectFilter === 'course'
+                        ? 'bg-white text-indigo-600 shadow-2xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Capstones ({courseProjects.length})
+                  </button>
+                  {matchedLiveProjects.length > 0 && (
+                    <button
+                      onClick={() => setProjectFilter('live')}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                        projectFilter === 'live'
+                          ? 'bg-white text-indigo-600 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Live Teams ({matchedLiveProjects.length})
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+
+              {/* Grid of Course Projects */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* 1. Internal Course Capstones */}
+                {(projectFilter === 'all' || projectFilter === 'course') &&
+                  courseProjects.map((proj, idx) => {
+                    const enrolled = isProjectEnrolled(proj.id);
+                    return (
+                      <div
+                        key={proj.id || idx}
+                        className="group p-5 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 uppercase tracking-wider">
+                              {proj.type || `Capstone 0${idx + 1}`}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {proj.duration || '2-3 Weeks'}
+                            </span>
+                          </div>
+
+                          <h3
+                            onClick={() => handleOpenProjectModal(proj)}
+                            className="font-bold text-base text-slate-900 group-hover:text-indigo-600 cursor-pointer transition line-clamp-1"
+                          >
+                            {proj.title}
+                          </h3>
+
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                            {proj.shortDesc || proj.desc || proj.fullDesc}
+                          </p>
+
+                          {/* Tech Tags */}
+                          {proj.technologies && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {proj.technologies.slice(0, 3).map((tech, tIdx) => (
+                                <span
+                                  key={tIdx}
+                                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-700"
+                                >
+                                  {tech}
+                                </span>
+                              ))}
+                              {proj.technologies.length > 3 && (
+                                <span className="text-[10px] text-slate-400 font-medium self-center">
+                                  +{proj.technologies.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Deliverables snippet & Mentor */}
+                        <div className="pt-3 border-t border-slate-200/70 space-y-3">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Mentor: <strong>{proj.mentor || course.instructor}</strong></span>
+                            </span>
+                            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                              {proj.difficulty || "Practical Lab"}
+                            </span>
+                          </div>
+
+                          {/* Buttons: Project Details & Enroll Option */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenProjectModal(proj)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 hover:border-slate-300 transition text-center cursor-pointer"
+                            >
+                              Project Details
+                            </button>
+
+                            {enrolled ? (
+                              <Link
+                                to="/dashboard"
+                                className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Enrolled</span>
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleEnrollInProject(proj)}
+                                className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs shadow-indigo-200 cursor-pointer"
+                              >
+                                <FolderGit2 className="w-3.5 h-3.5" />
+                                <span>Enroll Project</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* 2. Connected Live Industry Projects */}
+                {(projectFilter === 'all' || projectFilter === 'live') &&
+                  matchedLiveProjects.map((proj) => {
+                    const enrolled = isProjectEnrolled(proj.id);
+                    return (
+                      <div
+                        key={proj.id}
+                        className="group p-5 rounded-2xl bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 border border-indigo-200/80 hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 uppercase tracking-wider">
+                              Live Industry Team
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {proj.duration}
+                            </span>
+                          </div>
+
+                          <h3
+                            onClick={() => handleOpenProjectModal(proj)}
+                            className="font-bold text-base text-slate-900 group-hover:text-indigo-600 cursor-pointer transition line-clamp-1"
+                          >
+                            {proj.title}
+                          </h3>
+
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                            {proj.shortDesc}
+                          </p>
+
+                          {/* Tech Tags */}
+                          {proj.technologies && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {proj.technologies.slice(0, 3).map((tech, tIdx) => (
+                                <span
+                                  key={tIdx}
+                                  className="px-2 py-0.5 rounded-md bg-white border border-indigo-100 text-[10px] font-semibold text-indigo-700"
+                                >
+                                  {tech}
+                                </span>
+                              ))}
+                              {proj.technologies.length > 3 && (
+                                <span className="text-[10px] text-slate-400 font-medium self-center">
+                                  +{proj.technologies.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Deliverables snippet & Mentor */}
+                        <div className="pt-3 border-t border-slate-200/70 space-y-3">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Mentor: <strong>{proj.mentor}</strong></span>
+                            </span>
+                            <span className="font-semibold text-indigo-600">
+                              {proj.enrolledStudents || 25} Students
+                            </span>
+                          </div>
+
+                          {/* Buttons: Project Details & Enroll Option */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenProjectModal(proj)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 hover:border-slate-300 transition text-center cursor-pointer"
+                            >
+                              Project Details
+                            </button>
+
+                            {enrolled ? (
+                              <Link
+                                to="/dashboard"
+                                className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Enrolled</span>
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleEnrollInProject(proj)}
+                                className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs shadow-indigo-200 cursor-pointer"
+                              >
+                                <FolderGit2 className="w-3.5 h-3.5" />
+                                <span>Enroll Project</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* In-Section Course Enrollment Callout */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-bold text-sm sm:text-base flex items-center gap-2">
+                    <PackageCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Enroll in this Course to Unlock Full Code Reviews & Certification</span>
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                    Get full lifetime access to all {course.lessonsCount || 30}+ lecture videos, downloadable firmware templates, circuit diagrams, and mentor feedback.
+                  </p>
+                </div>
+                <button
+                  onClick={handleEnrollAction}
+                  className={`px-5 py-2.5 rounded-xl font-bold text-xs shrink-0 transition flex items-center gap-1.5 shadow-md cursor-pointer ${
+                    isEnrolled
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      : 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-indigo-500/25'
+                  }`}
+                >
+                  {isEnrolled ? (
+                    <>
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Continue Learning</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Enroll in Course (${course.price})</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
 
             {/* CERTIFICATION PREVIEW BANNER */}
             <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
@@ -499,12 +752,66 @@ export default function CourseDetails() {
 
       </div>
 
+      {/* Interactive Project Details & Enrollment Modal */}
+      <CourseProjectModal
+        project={selectedProject}
+        course={course}
+        isOpen={projectModalOpen}
+        onClose={() => {
+          setProjectModalOpen(false);
+          setSelectedProject(null);
+        }}
+        isProjectEnrolled={selectedProject ? isProjectEnrolled(selectedProject.id) : false}
+        onEnrollProject={(proj) => {
+          handleEnrollInProject(proj);
+        }}
+        isCourseEnrolled={isEnrolled}
+        onEnrollCourse={handleEnrollAction}
+      />
+
       {/* Certificate Preview Modal */}
       <CertificateModal
         isOpen={certModalOpen}
         onClose={() => setCertModalOpen(false)}
-        certificate={sampleCertificates[0]}
+        certificate={(sampleCertificates && sampleCertificates[0]) || (certificates && certificates[0]) || null}
       />
+
+      {/* Mobile Sticky Bottom Enrollment Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 p-3.5 shadow-2xl flex items-center justify-between gap-4">
+        <div>
+          <span className="text-xs text-slate-400 block leading-tight">Course Price</span>
+          <span className="text-lg font-extrabold text-slate-900">${course.price}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href="#course-projects-section"
+            className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1"
+          >
+            <FolderGit2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Projects ({courseProjects.length})</span>
+          </a>
+          <button
+            onClick={handleEnrollAction}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+              isEnrolled
+                ? 'bg-emerald-600 text-white'
+                : 'bg-indigo-600 text-white'
+            }`}
+          >
+            {isEnrolled ? (
+              <>
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Continue</span>
+              </>
+            ) : (
+              <>
+                <span>Enroll Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
