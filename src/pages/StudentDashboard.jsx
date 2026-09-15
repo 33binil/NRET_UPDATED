@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import ProjectModal from '../components/ProjectModal';
 import {
   LayoutDashboard,
   BookOpen,
@@ -21,7 +22,11 @@ import {
   Bell,
   FolderGit2,
   Users,
-  Cpu
+  Cpu,
+  Target,
+  ExternalLink,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 
 export default function StudentDashboard() {
@@ -37,6 +42,32 @@ export default function StudentDashboard() {
     updateStudentProjectProgress
   } = useApp();
   const navigate = useNavigate();
+
+  const [selectedLiveProject, setSelectedLiveProject] = useState(null);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [projectStatusFilter, setProjectStatusFilter] = useState('all');
+
+  const handleResumeProject = (sp, projectData) => {
+    const fullProject = {
+      ...(projectData || {}),
+      id: sp.projectId,
+      title: sp.title || projectData?.title || 'Live Engineering Project',
+      category: sp.category || projectData?.category || 'Engineering',
+      mentor: sp.mentor || projectData?.mentor || 'Faculty Mentor',
+      mentorDesignation: projectData?.mentorDesignation || 'Senior Faculty Mentor',
+      mentorAvatar: projectData?.mentorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      thumbnail: projectData?.thumbnail || 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
+      progress: sp.progress,
+      stage: sp.stage || sp.currentPhase || 'Development',
+      currentSprint: sp.currentSprint,
+      completedMilestones: sp.completedMilestones,
+      role: sp.role,
+      team: sp.team,
+      deadline: sp.deadline || projectData?.deadline
+    };
+    setSelectedLiveProject(fullProject);
+    setIsProjectModalOpen(true);
+  };
 
   // Enrolled courses details
   const enrolledCourseDetails = enrolledCourses.map((e) => {
@@ -221,118 +252,238 @@ export default function StudentDashboard() {
             </div>
 
             {/* MY LIVE PROJECTS (PRACTICAL PROGRAM LEARNING) */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
+            <div id="my-live-projects-section" className="space-y-4 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <h2 className="text-xl font-bold text-slate-900 tracking-tight">My Live Projects</h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {studentLiveProjects?.length || 0} Active
+                      {(studentLiveProjects || []).length} Active Projects
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">Real-world industry engineering projects under faculty mentorship</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Real-world engineering systems under direct faculty mentorship with industry deliverables
+                  </p>
                 </div>
-                <Link to="/programs?tab=projects" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                  <span>Explore Catalog</span>
-                  <ArrowRight className="w-3 h-3" />
-                </Link>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold text-slate-600">
+                    <button
+                      onClick={() => setProjectStatusFilter('all')}
+                      className={`px-3 py-1 rounded-lg transition ${projectStatusFilter === 'all' ? 'bg-white text-indigo-700 shadow-2xs' : 'hover:text-slate-900'}`}
+                    >
+                      All ({studentLiveProjects?.length || 0})
+                    </button>
+                    <button
+                      onClick={() => setProjectStatusFilter('active')}
+                      className={`px-3 py-1 rounded-lg transition ${projectStatusFilter === 'active' ? 'bg-white text-indigo-700 shadow-2xs' : 'hover:text-slate-900'}`}
+                    >
+                      In Progress ({(studentLiveProjects || []).filter(p => (p.progress || 0) < 100).length})
+                    </button>
+                    <button
+                      onClick={() => setProjectStatusFilter('completed')}
+                      className={`px-3 py-1 rounded-lg transition ${projectStatusFilter === 'completed' ? 'bg-white text-indigo-700 shadow-2xs' : 'hover:text-slate-900'}`}
+                    >
+                      Completed ({(studentLiveProjects || []).filter(p => (p.progress || 0) >= 100).length})
+                    </button>
+                  </div>
+
+                  <Link to="/programs?tab=projects" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hidden sm:flex items-center gap-1">
+                    <span>Catalog</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
               </div>
 
               {studentLiveProjects && studentLiveProjects.length > 0 ? (
                 <div className="space-y-4">
-                  {studentLiveProjects.map((sp) => {
-                    const project = (liveProjects || []).find(p => p.id === sp.projectId) || {
-                      title: 'Live Engineering Project',
-                      category: 'Robotics & Automation',
-                      mentor: 'Faculty Mentor',
-                      duration: '8 Weeks'
-                    };
+                  {(studentLiveProjects || [])
+                    .filter(sp => {
+                      if (projectStatusFilter === 'active') return (sp.progress || 0) < 100;
+                      if (projectStatusFilter === 'completed') return (sp.progress || 0) >= 100;
+                      return true;
+                    })
+                    .map((sp) => {
+                      const project = (liveProjects || []).find(p => p.id === sp.projectId) || {};
+                      const projectTitle = sp.title || project.title || 'Live Engineering Project';
+                      const projectCategory = sp.category || project.category || 'Robotics & Automation';
+                      const mentorName = sp.mentor || project.mentor || 'Dr. Arun Kumar';
+                      const mentorDesignation = project.mentorDesignation || 'Lead Robotics & Embedded Systems Trainer';
+                      const mentorAvatar = project.mentorAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+                      const projectThumbnail = project.thumbnail || 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80';
+                      const isCompleted = (sp.progress || 0) >= 100;
 
-                    return (
-                      <div
-                        key={sp.projectId}
-                        className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs hover:shadow-md transition space-y-4"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase tracking-wide">
-                                Live Project
-                              </span>
-                              <span className="text-[11px] font-medium text-slate-500">
-                                {project.category}
-                              </span>
+                      return (
+                        <div
+                          key={sp.projectId}
+                          id={`live-project-card-${sp.projectId}`}
+                          className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs hover:shadow-md transition space-y-5"
+                        >
+                          {/* Card Header: Thumbnail, Title, Badges & Quick-Link CTA */}
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <img
+                                src={projectThumbnail}
+                                alt={projectTitle}
+                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs"
+                              />
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                    isCompleted 
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  }`}>
+                                    {isCompleted ? 'Completed' : (sp.status || 'Active Sprint')}
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-slate-500">
+                                    {projectCategory}
+                                  </span>
+                                  <span className="text-[11px] text-slate-300">•</span>
+                                  <span className="text-[11px] font-medium text-slate-600">
+                                    Role: <strong className="text-slate-800">{sp.role || 'Firmware Contributor'}</strong>
+                                  </span>
+                                </div>
+                                <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug">
+                                  {projectTitle}
+                                </h3>
+                                <p className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                  <span>Team: <strong className="text-slate-700 font-semibold">{sp.team || 'NRET Core Team'}</strong></span>
+                                  <span>•</span>
+                                  <span>Deadline: <strong className="text-slate-700 font-semibold">{sp.deadline || 'End of Sprint'}</strong></span>
+                                </p>
+                              </div>
                             </div>
-                            <h3 className="font-bold text-base text-slate-900">
-                              {project.title}
-                            </h3>
-                            <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
-                              <span>Mentor: <strong className="text-slate-700 font-semibold">{project.mentor}</strong></span>
-                              <span>•</span>
-                              <span>Role: <strong className="text-slate-700 font-semibold">{sp.role || 'Embedded Firmware Lead'}</strong></span>
-                              <span>•</span>
-                              <span>Team: <strong className="text-slate-700 font-semibold">{sp.teamMembers?.length || 3} Students</strong></span>
+
+                            {/* Quick-Link Button to Resume Progress */}
+                            <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0">
+                              <button
+                                id={`resume-progress-btn-${sp.projectId}`}
+                                onClick={() => handleResumeProject(sp, project)}
+                                className="w-full sm:w-auto px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-2 group cursor-pointer"
+                                title="Resume project workspace & deliverables"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current text-white group-hover:scale-110 transition-transform" />
+                                <span>Resume Progress</span>
+                              </button>
+                              
+                              <Link
+                                to={`/programs?tab=projects&id=${sp.projectId}`}
+                                className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 transition"
+                              >
+                                <span>Full Workspace</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Link>
                             </div>
                           </div>
 
-                          <Link
-                            to={`/programs?tab=projects&id=${sp.projectId}`}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
-                          >
-                            <span>Open Project Workspace</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-
-                        {/* Progress Bar & Current Phase */}
-                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                          <div className="space-y-1.5 flex-1 max-w-md">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-slate-700">Project Milestone Progress</span>
-                              <span className="font-bold text-indigo-600">{sp.progress}%</span>
+                          {/* Visual Progress Bar Section */}
+                          <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-100 space-y-3">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 text-xs">Project Milestone Progress</span>
+                                <span className="text-[11px] text-slate-500 font-medium">
+                                  ({sp.completedMilestones?.length || 3} of 6 phases completed)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-extrabold text-indigo-600">{sp.progress || 0}%</span>
+                                <span className="text-[11px] font-semibold text-slate-500">
+                                  • {sp.stage || 'Development Phase'}
+                                </span>
+                              </div>
                             </div>
-                            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+
+                            {/* The Visual Progress Track */}
+                            <div className="w-full bg-slate-200/80 rounded-full h-3 overflow-hidden p-0.5">
                               <div
-                                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                                style={{ width: `${sp.progress}%` }}
+                                className={`h-full rounded-full transition-all duration-700 ${
+                                  isCompleted
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                                    : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-xs'
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(5, sp.progress || 0))}%` }}
                               />
                             </div>
+
+                            {/* Current Sprint Focus & Sprint Stepper */}
+                            <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                              <div className="text-slate-600 text-[11px] flex items-center gap-1.5 min-w-0">
+                                <Target className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span className="font-semibold text-slate-700 shrink-0">Current Sprint:</span>
+                                <span className="truncate text-slate-600">{sp.currentSprint || 'Hardware calibration, PID tuning and state machine logic'}</span>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  const nextProgress = Math.min(100, (sp.progress || 0) + 15);
+                                  updateStudentProjectProgress(sp.projectId, nextProgress);
+                                }}
+                                className="self-start sm:self-auto px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 rounded-lg transition shrink-0 flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title="Update and advance sprint progress (+15%)"
+                              >
+                                <span>+ Advance Sprint (+15%)</span>
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="text-right">
-                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Current Phase</span>
-                              <span className="font-bold text-slate-800 text-xs">{sp.currentPhase || 'Phase 4: Development'}</span>
+                          {/* Mentor Details Section */}
+                          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={mentorAvatar}
+                                alt={mentorName}
+                                className="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-50 border border-slate-200 shrink-0"
+                              />
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-slate-900">{mentorName}</span>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-600">
+                                    Assigned Mentor
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                  {mentorDesignation}
+                                </p>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => {
-                                const nextProgress = Math.min(100, sp.progress + 15);
-                                updateStudentProjectProgress(sp.projectId, nextProgress);
-                              }}
-                              className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
-                            >
-                              + Update Sprint
-                            </button>
+
+                            <div className="flex items-center gap-2 self-start sm:self-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Weekly Sync: Active
+                              </span>
+                              {sp.repositoryUrl && (
+                                <a
+                                  href={sp.repositoryUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition"
+                                  title="Open Project Code Repository"
+                                >
+                                  <FolderGit2 className="w-4 h-4" />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-200 text-center space-y-3">
-                  <FolderGit2 className="w-8 h-8 text-slate-300 mx-auto" />
+                <div className="p-8 rounded-3xl bg-white border border-dashed border-slate-200 text-center space-y-3">
+                  <FolderGit2 className="w-10 h-10 text-slate-300 mx-auto" />
                   <div>
-                    <h4 className="font-bold text-sm text-slate-800">No active live projects</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Join an active live robotics, IoT, or web engineering team under faculty guidance.
+                    <h4 className="font-bold text-sm text-slate-800">No active live projects found</h4>
+                    <p className="text-xs text-slate-500 mt-0.5 max-w-md mx-auto">
+                      Join an active live robotics, IoT, or web engineering team under direct faculty guidance.
                     </p>
                   </div>
                   <Link
                     to="/programs?tab=projects"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-xs transition"
                   >
-                    <span>Browse Live Projects</span>
+                    <span>Browse Live Projects Catalog</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -436,6 +587,16 @@ export default function StudentDashboard() {
           </div>
 
         </div>
+
+        {/* Interactive Live Project Workspace & Deliverables Modal */}
+        <ProjectModal
+          project={selectedLiveProject}
+          isOpen={isProjectModalOpen}
+          onClose={() => {
+            setIsProjectModalOpen(false);
+            setSelectedLiveProject(null);
+          }}
+        />
 
       </div>
     </div>
